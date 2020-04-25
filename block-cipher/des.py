@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from binascii import hexlify
-
 from blockcipher import *
 
 # initial permutation for data
@@ -121,6 +119,10 @@ class DES:
         self.rounds = 16
         self.k1 = None
         self.k2 = None
+        self.mode = mode
+        if mode != ECB:
+            print("[-] Mode is not implemented")
+
         if whitening:
             self.subkeys = gen_subkeys(key, self.rounds + 2)
             self.k1 = self.subkeys[-2].ljust(8, '\x00')
@@ -133,7 +135,6 @@ class DES:
             print("Whitening 2: {}".format(hexlify(self.k2)))
             print("")
 
-        self.mode = mode
         self.block_size = 8
 
     def encrypt(self, plaintext):
@@ -179,15 +180,6 @@ class DES:
                 print("")
 
         return pkcs7_unpad(decrypted, self.block_size)
-
-
-def pkcs7_pad(data, size):
-    pad_len = size - (len(data) % size)
-    return data.ljust(size, chr(pad_len))
-
-def pkcs7_unpad(data, size):
-    pad_len = ord(data[-1])
-    return data[:-pad_len]
 
 
 def gen_des_key(key):
@@ -240,34 +232,6 @@ def is_des_key(key):
         counter += 1
     
     return True
-
-
-def split_by_blocks_padding(data, block_size):
-    block_count = len(data) // block_size
-    blocks = split_by_blocks(data, block_size)
-
-    last_block_size = len(data) - block_count * block_size
-
-    if last_block_size:
-        blocks.append(
-            pkcs7_pad(
-                data[block_count * block_size : ],
-                block_size
-                )
-            )
-    else:
-        blocks.append(chr(block_size) * block_size)
-
-    return blocks
-
-def split_by_blocks(data, block_size):
-    block_count = len(data) // block_size
-    blocks = []
-
-    for i in range(0, block_count * block_size, block_size):
-        blocks.append(data[i:i + block_size])
-
-    return blocks
 
 
 def gen_subkeys(key, rounds):
