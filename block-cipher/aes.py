@@ -99,9 +99,9 @@ class AES:
                 print("After whitening (AddRoundKey):")
                 print_matrix(state)
 
-            for i in range(1, 10):
+            for i in range(1, self.rounds + 1):
                 if VERBOSE and i == 1:
-                    print("Round 1:")
+                    print(f"Round {i}:")
 
                 state = sub_byte(state, operation=ENCRYPT)
                 if VERBOSE and i == 1:
@@ -113,20 +113,17 @@ class AES:
                     print("After ShiftRows:")
                     print_matrix(state)
 
-                state = mix_columns(state, operation=ENCRYPT)
-                if VERBOSE and i == 1:
-                    print("After MixColumns:")
-                    print_matrix(state)
+                if i != self.rounds: # for last round
+                    state = mix_columns(state, operation=ENCRYPT)
+                    if VERBOSE and i == 1:
+                        print("After MixColumns:")
+                        print_matrix(state)
 
                 state = add_round_key(state, self.subkeys[i])
                 if VERBOSE and i == 1:
                     print("After AddRoundKey:")
                     print_matrix(state)
 
-            state = sub_byte(state, operation=ENCRYPT)
-            state = shift_rows(state, operation=ENCRYPT)
-            state = add_round_key(state, self.subkeys[10])
-            
             block = matrix_to_block(state)
 
             ciphertext = ciphertext + block
@@ -149,16 +146,34 @@ class AES:
                 print_matrix(state)
 
             state = add_round_key(state, self.subkeys[10])
-            state = shift_rows(state, operation=DECRYPT)
-            state = sub_byte(state, operation=DECRYPT)
+            if VERBOSE:
+                print("After AddRoundKey:")
+                print_matrix(state)
 
-            for i in range(9, 0, -1):
-                state = add_round_key(state, self.subkeys[i])
-                state = mix_columns(state, operation=DECRYPT)
+            for i in range(self.rounds - 1, -1, -1):
+                if VERBOSE and i == (self.rounds - 1):
+                    print(f"Round {self.rounds - i}:")
+
                 state = shift_rows(state, operation=DECRYPT)
-                state = sub_byte(state, operation=DECRYPT)
+                if VERBOSE and i == (self.rounds - 1):
+                    print("After inverse ShiftRows:")
+                    print_matrix(state)
 
-            state = add_round_key(state, self.subkeys[0])
+                state = sub_byte(state, operation=DECRYPT)
+                if VERBOSE and i == (self.rounds - 1):
+                    print("After inverse SubBute:")
+                    print_matrix(state)
+
+                state = add_round_key(state, self.subkeys[i])
+                if VERBOSE and i == (self.rounds - 1):
+                    print("After AddRoundKey:")
+                    print_matrix(state)
+
+                if i != 0:
+                    state = mix_columns(state, operation=DECRYPT)
+                    if VERBOSE and i == (self.rounds - 1):
+                        print("After inverse MixColumns:")
+                        print_matrix(state)
 
             block = matrix_to_block(state)
 
@@ -229,7 +244,7 @@ def gen_subkeys(key, rounds):
         print("Round key 0:")
         print_matrix(subkeys_matrix[-1])
 
-    for i in range(1, rounds + 1):
+    for i in range(1, rounds):
         subkey = []
         subkey.append(word_xor(subkeys[-1][0], key_round(subkeys[-1][key_words - 1], i)))
 
@@ -324,6 +339,7 @@ if __name__ == "__main__":
         print("Secret: {}, {}".format(hex(s_a[0]), hex(s_a[1])))
 
     key = byte_coord_to_sha1(s_a[0], 16)
+    key = b"\xF1\x99\x93\xB5\x0B\x92\xA1\x9B\x05\x66\x7D\x9E\xEE\x0A\xEC\x56"
     print("Key (x with sha1): {}".format(key.hex()))
     iv = byte_coord_to_sha1(s_a[1], 16)
 
