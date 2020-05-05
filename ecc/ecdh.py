@@ -3,6 +3,7 @@
 import sys
 import random
 import hashlib
+from Crypto.Util.number import bytes_to_long, long_to_bytes
 
 sys.path.insert(1, './finite-field')
 from finitefield import *
@@ -37,25 +38,42 @@ class ECDH:
 
     def is_point_on_curve(self, point):
         # None is inf
-        if point is None:
+        if point == (0, 0):
             return True
         
         x, y = point
         # y**2 = x**3 + a*x + b
         return (pow(x, 3, self.p) + (self.a * x % self.p) + self.b - pow(y, 2, self.p)) % self.p == 0
 
+    def get_y_by_x(self, x):
+        # Lagrange's formula:
+        # https://en.wikipedia.org/wiki/Quadratic_residue#Prime_or_prime_power_modulus
+
+        y_2 = (pow(x, 3, self.p) + self.a * x + self.b) % self.p
+        if pow(y_2, (self.p - 1) // 2, self.p) == 1: # y**2 is a quadratic residue of p
+            if self.p % 4 == 3:
+                y = pow(y_2, (self.p + 1) // 4, self.p)
+                if self.is_point_on_curve((x, y)):
+                    return y, -y % self.p
+            
+            if self.p % 8 == 5:
+                y = pow(y_2, (self.p + 3) // 8, self.p)
+                if self.is_point_on_curve((x, y)):
+                    return y, -y % self.p
+        return None
+
     def point_negative(self, point):
-        if point is None:
-            return None
+        if point == (0, 0):
+            return (0, 0)
 
         x, y = point
         return (x, -y % self.p)
 
     def point_add(self, point1, point2):
-        if point1 == None:
+        if point1 == (0, 0):
             return point2
         
-        if point2 == None:
+        if point2 == (0, 0):
             return point1
 
         x1, y1 = point1
@@ -63,19 +81,20 @@ class ECDH:
 
         if x1 == x2 and y1 != y2:
             # each x has 2 points, so y1 == -y2 (y2 is a negative point)
-            return None
+            return (0, 0)
 
         if point1 != point2:
-            m = ((y2 - y1) * inv_mod((x2 - x1), self.p)) % self.p
+            m = ((y1 - y2) * inv_mod((x1 - x2), self.p)) % self.p
         else:
             m = ((3 * pow(x1, 2, self.p) + self.a) * inv_mod((2 * y1), self.p)) % self.p
 
         # x3 = m**2 - x1 - x2
         x3 = (pow(m, 2, self.p) - x1 - x2) % self.p
-        # -y3 = y1 - m * (x3 - x1)
-        y3 = -(y1 + m * (x3 - x1)) % self.p
+        # y3 = y1 - m * (x3 - x1)
+        y3 = y1 + m * (x3 - x1) % self.p
 
-        return (x3, y3)
+        # P + Q = -R
+        return self.point_negative((x3, y3))
 
     def point_mult_naive(self, point, k):
         # SO SLOW, DO NOT USE IT
@@ -86,10 +105,10 @@ class ECDH:
         return res_point
 
     def point_mult_k(self, point, k):
-        # if k % self.n == 0:
-        #     return None
+        if (self.n is not None) and (k % self.n == 0):
+            return (0, 0)
         
-        res_point = None
+        res_point = (0, 0)
         cur_power = point
 
         # decompose k into powers of two
@@ -114,20 +133,53 @@ class ECDH:
         e = self.point_mult_k(self.g, d)
         return d, e
 
-from six import int2byte, b
 
-def int_to_string(x):
-    """Convert integer x into a string of bytes, as per X9.62."""
-    assert x >= 0
-    if x == 0:
-        return b("\0")
-    result = []
-    while x:
-        ordinal = x & 0xFF
-        result.append(int2byte(ordinal))
-        x >>= 8
-    result.reverse()
-    return b("").join(result)
+def str_coord_to_sha1(x, size):
+    sha1 = hashlib.sha1()
+    sha1.update(str(x).encode('ascii'))
+    key = sha1.digest()[:size]
+    return key
+
+def byte_coord_to_sha1(x, size):
+    sha1 = hashlib.sha1()
+    sha1.update(long_to_bytes(x))
+    key = sha1.digest()[:size]
+    return key
+
+
+### TEST
+
+def TEST_mult_add():
+    dh = ECDH(None, 97, 2, 3)
+    p = (3, 6)
+    assert(dh.point_mult_k(p, 0) == (0, 0))
+    assert(dh.point_mult_k(p, 1) == (3, 6))
+    assert(dh.point_mult_k(p, 2) == (80, 10))
+    assert(dh.point_mult_k(p, 3) == (80, 87))
+    assert(dh.point_mult_k(p, 4) == (3, 91))
+    assert(dh.point_mult_k(p, 5) == (0, 0))
+
+def TEST_gen_key():
+    dh = ECDH(None, 9739, 497, 1768, (1804, 5368))
+    q_a = (815, 3190)
+    n_b = 1829
+    p = dh.point_mult_k(q_a, n_b)
+    assert(p == (7929, 707))
+
+def TEST_gen_key_one_coord():
+    dh = ECDH(None, 9739, 497, 1768, (1804, 5368))
+    q_x = 4726
+    n_b = 6534
+    q_y1, q_y2 = dh.get_y_by_x(q_x)
+    assert(q_y1 == 3452 or q_y1 == 6287)
+    assert(q_y2 == 3452 or q_y2 == 6287)
+
+    p1 = dh.point_mult_k((q_x, q_y1), n_b)
+    p2 = dh.point_mult_k((q_x, q_y2), n_b)
+    inv_p2 = (dh.point_negative(p2))
+    assert(inv_p2 == p1)
+    assert(p2[0] == p1[0])
+
 
 if __name__ == "__main__":
 
