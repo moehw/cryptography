@@ -188,39 +188,46 @@ def matrix_to_block(state):
     block = b""
     for i in range(4):
         for row in state:
-            block += row[i].to_bytes(1, 'big')
+            block += to_byte(row[i])
     return block
 
 
 def word_rot(word):
     res = word[1:]
-    res.append(word[0])
+    res += to_byte(word[0])
     return res
 
 def word_xor(word1, word2):
-    word = []
+    word = b''
     for elem1, elem2 in zip(word1, word2):
-        word.append(elem1 ^ elem2)
+        word += to_byte(elem1 ^ elem2)
     return word
 
 def key_round(word, cur_round):
     word = word_rot(word)
+
+    word_sub = b''
     for i in range(len(word)):
-        word[i] = SBOX[word[i]]
+        word_sub += to_byte(SBOX[word[i]])
     
-    word[0] ^= RC[cur_round]
+    word = to_byte(word_sub[0] ^ RC[cur_round]) + word_sub[1:]
+           
     return word
 
 def gen_subkeys(key, rounds):
     subkeys = []
+    subkeys_matrix = []
+
     if VERBOSE:
         print("Key generate:")
 
-    key_words = len(key) // 4
-    subkeys.append(block_to_matrix(key))
+    subkeys.append(split_by_blocks(key, 4))
+    subkeys_matrix.append(block_to_matrix(key))
+    key_words = len(subkeys[-1])
+
     if VERBOSE:
         print("Round key 0:")
-        print_matrix(subkeys[-1])
+        print_matrix(subkeys_matrix[-1])
 
     for i in range(1, rounds + 1):
         subkey = []
@@ -229,16 +236,16 @@ def gen_subkeys(key, rounds):
         for j in range(1, key_words):
             subkey.append(word_xor(subkeys[-1][j], subkey[-1]))
 
+        subkeys.append(subkey)
+        subkeys_matrix.append(block_to_matrix(join_blocks(subkey)))
         if VERBOSE:
             print("Round key {}:".format(i))
-            print_matrix(subkey)
-
-        subkeys.append(subkey)
+            print_matrix(subkeys_matrix[-1])
 
     if VERBOSE:
         print("")
         
-    return subkeys
+    return subkeys_matrix
 
 
 def add_round_key(state, subkey):

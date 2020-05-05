@@ -70,6 +70,12 @@ def split_by_blocks(data, block_size):
 
     return blocks
 
+def join_blocks(blocks):
+    return b''.join([i for i in blocks])
+
+
+def to_byte(integer):
+    return integer.to_bytes(1, 'big')
 
 def str_to_binary(text):
     return ''.join(bin(ord(x))[2:].rjust(8, '0') for x in text)
