@@ -226,7 +226,6 @@ def key_round(word, cur_round):
         word_sub += to_byte(SBOX[word[i]])
     
     word = to_byte(word_sub[0] ^ RC[cur_round]) + word_sub[1:]
-           
     return word
 
 def gen_subkeys(key, rounds):
@@ -317,31 +316,68 @@ def mix_columns(state, operation=ENCRYPT):
 
 if __name__ == "__main__":
     dh = ECDH(curve='secp128r1')
+    key = b''
+    iv = b''
 
-    d_a, e_a = dh.gen_key_pair()
-    print("Alice's keys:")
-    print("Private: {}".format(hex(d_a)))
-    print("Public : {}, {}".format(hex(e_a[0]), hex(e_a[1])))
-    print("")
+    print("-= AES =-")
+    print("Use as secret:")
+    print("1. Only x")
+    print("2. (x, y)")
+    choice = input()
 
-    d_b, e_b = dh.gen_key_pair()
-    print("Bob's keys:")
-    print("Private: {}".format(hex(d_b)))   
-    print("Public : {}, {}".format(hex(e_b[0]), hex(e_b[1])))
-    print("")
-    
-    s_a = dh.point_mult_k(e_b, d_a)
-    s_b = dh.point_mult_k(e_a, d_b)
+    if choice == '1':
+        d_a, e_a = dh.gen_key_pair()
+        print("Alice's keys:")
+        print("Private: {}".format(hex(d_a)))
+        print("Public : {}".format(hex(e_a[0])))
 
-    if s_a != s_b:
-        print("[-] Secrets are different")
+        d_b, e_b = dh.gen_key_pair()
+        print("Bob's keys:")
+        print("Private: {}".format(hex(d_b)))   
+        print("Public : {}".format(hex(e_b[0])))
+        print("")
+
+        y1, y2 = dh.get_y_by_x(e_a[0])
+        
+        p1 = dh.point_mult_k((e_a[0], y1), d_b)
+        p2 = dh.point_mult_k((e_a[0], y2), d_b)
+
+        print("Secret points:")
+        print("{}, {}".format(hex(p1[0]), hex(p1[1])))
+        print("{}, {}".format(hex(p2[0]), hex(p2[1])))
+        print("")
+
+        if p1[0] != p2[0]:
+            print("[-] Secrets are different")
+        else:
+            print("Secret: {}".format(hex(p1[0])))
+        key = p1[0]
+
     else:
-        print("Secret: {}, {}".format(hex(s_a[0]), hex(s_a[1])))
+        d_a, e_a = dh.gen_key_pair()
+        print("Alice's keys:")
+        print("Private: {}".format(hex(d_a)))
+        print("Public : {}, {}".format(hex(e_a[0]), hex(e_a[1])))
+        print("")
 
-    key = byte_coord_to_sha1(s_a[0], 16)
-    key = b"\xF1\x99\x93\xB5\x0B\x92\xA1\x9B\x05\x66\x7D\x9E\xEE\x0A\xEC\x56"
+        d_b, e_b = dh.gen_key_pair()
+        print("Bob's keys:")
+        print("Private: {}".format(hex(d_b)))   
+        print("Public : {}, {}".format(hex(e_b[0]), hex(e_b[1])))
+        print("")
+        
+        s_a = dh.point_mult_k(e_b, d_a)
+        s_b = dh.point_mult_k(e_a, d_b)
+
+        if s_a != s_b:
+            print("[-] Secrets are different")
+        else:
+            print("Secret: {}, {}".format(hex(s_a[0]), hex(s_a[1])))
+        key = s_a[0]
+
+    key = byte_coord_to_sha1(key, 16)
+    # key = b"\xF1\x99\x93\xB5\x0B\x92\xA1\x9B\x05\x66\x7D\x9E\xEE\x0A\xEC\x56"
     print("Key (x with sha1): {}".format(key.hex()))
-    iv = byte_coord_to_sha1(s_a[1], 16)
 
     aes = AES(key, ECB, iv)
 
