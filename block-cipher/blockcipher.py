@@ -36,11 +36,13 @@ def pkcs7_unpad(data, size):
     else:
         pad_len = ord(data[-1])
 
+    # check for valid padding
     for i in range(pad_len):
         if data[- (i + 1)] != data[-1]:
             print("[WARN] Invalid padding")
+            break
 
-    return data[:-pad_len]
+    return data[:-pad_len] if pad_len <= len(data) else data
 
 
 def split_by_blocks_padding(data, block_size):
