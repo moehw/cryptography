@@ -12,6 +12,8 @@ from ecdh import *
 
 sys.path.insert(1, './finite-field')
 sys.path.insert(1, '../finite-field')
+from finitefield import *
+
 from blockcipher import *
 
 
@@ -89,14 +91,37 @@ class AES:
                 print("Block: {}".format(block))
 
             state = block_to_matrix(block)
+            if VERBOSE:
+                print_matrix(state)
 
             state = add_round_key(state, self.subkeys[0])
+            if VERBOSE:
+                print("After whitening (AddRoundKey):")
+                print_matrix(state)
 
             for i in range(1, 10):
+                if VERBOSE and i == 1:
+                    print("Round 1:")
+
                 state = sub_byte(state, operation=ENCRYPT)
+                if VERBOSE and i == 1:
+                    print("After SubByte:")
+                    print_matrix(state)
+
                 state = shift_rows(state, operation=ENCRYPT)
+                if VERBOSE and i == 1:
+                    print("After ShiftRows:")
+                    print_matrix(state)
+
                 state = mix_columns(state, operation=ENCRYPT)
+                if VERBOSE and i == 1:
+                    print("After MixColumns:")
+                    print_matrix(state)
+
                 state = add_round_key(state, self.subkeys[i])
+                if VERBOSE and i == 1:
+                    print("After AddRoundKey:")
+                    print_matrix(state)
 
             state = sub_byte(state, operation=ENCRYPT)
             state = shift_rows(state, operation=ENCRYPT)
@@ -120,6 +145,8 @@ class AES:
                 print("Block: {}".format(block))
 
             state = block_to_matrix(block)
+            if VERBOSE:
+                print_matrix(state)
 
             state = add_round_key(state, self.subkeys[10])
             state = shift_rows(state, operation=DECRYPT)
@@ -144,18 +171,16 @@ class AES:
 
 def print_matrix(state):
     for row in state:
-        print(row)
+        row_str = ''.join([(hex(i)[2:].rjust(2, '0') + ' ') for i in row])
+        print(row_str)
 
 def block_to_matrix(block):
     state = []
-
     for i in range(4): 
         row = [] 
         for j in range(i, 16, 4): 
             row.append(block[j])
         state.append(row)
-        if VERBOSE:
-            print(row)
 
     return state
 
@@ -167,7 +192,7 @@ def matrix_to_block(state):
     return block
 
 
-def rot_word(word):
+def word_rot(word):
     res = word[1:]
     res.append(word[0])
     return res
@@ -178,8 +203,8 @@ def word_xor(word1, word2):
         word.append(elem1 ^ elem2)
     return word
 
-def key_round_g(word, cur_round):
-    word = rot_word(word)
+def key_round(word, cur_round):
+    word = word_rot(word)
     for i in range(len(word)):
         word[i] = SBOX[word[i]]
     
@@ -189,14 +214,17 @@ def key_round_g(word, cur_round):
 def gen_subkeys(key, rounds):
     subkeys = []
     if VERBOSE:
-        print("Key:")
+        print("Key generate:")
 
     key_words = len(key) // 4
     subkeys.append(block_to_matrix(key))
+    if VERBOSE:
+        print("Round key 0:")
+        print_matrix(subkeys[-1])
 
     for i in range(1, rounds + 1):
         subkey = []
-        subkey.append(word_xor(subkeys[-1][0], key_round_g(subkeys[-1][key_words - 1], i)))
+        subkey.append(word_xor(subkeys[-1][0], key_round(subkeys[-1][key_words - 1], i)))
 
         for j in range(1, key_words):
             subkey.append(word_xor(subkeys[-1][j], subkey[-1]))
@@ -288,17 +316,14 @@ if __name__ == "__main__":
     else:
         print("Secret: {}, {}".format(hex(s_a[0]), hex(s_a[1])))
 
-    key = long_to_bytes(s_a[0])
-    # key = hashlib.sha1(long_to_bytes(s_a[0])).hexdigest()
-    print("Key: {}".format(key.hex()))
-    iv = long_to_bytes(s_a[1])
-    # iv = hashlib.sha1(long_to_bytes(s_a[1])).hexdigest()
-
-    plaintext = b"Hello, world!"
-
-    print("Plaintext: {}".format(plaintext))
+    key = byte_coord_to_sha1(s_a[0], 16)
+    print("Key (x with sha1): {}".format(key.hex()))
+    iv = byte_coord_to_sha1(s_a[1], 16)
 
     aes = AES(key, ECB, iv)
+
+    plaintext = b"Hello, world!"
+    print("Plaintext: {}".format(plaintext))
 
     ciphertext = aes.encrypt(plaintext)
     print("Ciphertext: {}".format(ciphertext.hex()))
