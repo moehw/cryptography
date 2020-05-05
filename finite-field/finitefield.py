@@ -35,9 +35,9 @@ def egcd(a, b):
     
     :returns: tuple of gcd, x and y.
     """
+    r, old_r = b, a
     s, old_s = 0, 1
     t, old_t = 1, 0
-    r, old_r = a, b
 
     while r != 0:
         quotient = old_r // r
@@ -45,7 +45,29 @@ def egcd(a, b):
         old_s, s = s, old_s - quotient * s
         old_t, t = t, old_t - quotient * t
 
-    return old_r, old_t, old_s
+    return old_r, old_s, old_t
+
+def egcd_polynomial(a, b):
+    """
+    Extended Euclidean algorithm for polynomials.
+    ax + by = gcd(a, b)
+
+    :param a: polynomial.
+    :param b: polynomial.
+    
+    :returns: tuple of gcd, x and y.
+    """
+    r, old_r = b, a
+    s, old_s = 0, 1
+    t, old_t = 1, 0
+
+    while r != 0:
+        quotient, reminder = divide_polynomials(old_r, r)
+        old_r, r = r, reminder
+        old_s, s = s, old_s ^ multiply_polynomials(quotient, s)
+        old_t, t = t, old_t ^ multiply_polynomials(quotient, t)
+
+    return old_r, old_s, old_t
 
 def inv_mod(k, p):
     """
@@ -231,20 +253,44 @@ def get_logarithm_table(power, primitive_polynomial):
         logarithm_table[i] = trim_polynomial(polynomial=multiplied_by_x_polynomial, length=power)
     return logarithm_table
 
-def multiply_polynomials_over_gf(polynomial1, polynomial2, p):
+def multiply_polynomials_over_gf(polynomial1, polynomial2, prime):
     """
     Multiplies two polynomials in GF(2ᵖᵒʷᵉʳ).
 
     :param polynomial1: 1st polynomial.
     :param polynomial2: 2nd polynomial.
-    :param p: modulo.
+    :param p: prime polynomial.
     
     :returns: the product of two polynomials.
     """
+
+    result = 0
+    for _ in range(msb(polynomial2) + 1):
+        if polynomial2 & 1 != 0:
+            result ^= polynomial1
+
+        polynomial1 <<= 1
+        if (msb(polynomial1) >= msb(prime)):
+            polynomial1 ^= prime
+        polynomial2 >>= 1
+
+    return result
+
+def multiply_polynomials_over_gf_slow(polynomial1, polynomial2, prime):
+    """
+    Multiplies two polynomials in GF(2ᵖᵒʷᵉʳ).
+
+    :param polynomial1: 1st polynomial.
+    :param polynomial2: 2nd polynomial.
+    :param p: prime polynomial.
+    
+    :returns: the product of two polynomials.
+    """
+
     mult = multiply_polynomials(polynomial1, polynomial2)
     reminder = mult
-    while msb(reminder) >= msb(p):
-        quotient, reminder = divide_polynomials(reminder, p)
+    while msb(reminder) >= msb(prime):
+        quotient, reminder = divide_polynomials(reminder, prime)
     return reminder
 
 def multiply_polynomials(polynomial1, polynomial2):
@@ -275,6 +321,9 @@ def divide_polynomials(polynomial1, polynomial2):
 
     :returns: the quotient and the remainder.
     """
+    if polynomial2 == 1:
+        return polynomial1, 0
+    
     quotient = 0
     reminder = polynomial1
     while msb(reminder) >= msb(polynomial2):
@@ -544,3 +593,19 @@ def msb(number):
         number = number >> 1
     
     return position
+
+
+def TEST_egcd_polynomials():
+    p = 0b100101
+    a = 0b111
+    r, s, t = egcd_polynomial(p, a)
+    assert(multiply_polynomials_over_gf(a, t, p) == 1)
+
+    p = 0b100011011
+    a = 0b10000110
+    r, s, t = egcd_polynomial(p, a)
+    assert(multiply_polynomials_over_gf(a, t, p) == 1)
+
+
+if __name__ == "__main__":
+    pass
