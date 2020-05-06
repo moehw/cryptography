@@ -25,7 +25,7 @@ def hexlify(string):
 def pkcs7_pad(data, size):
     pad_len = size - (len(data) % size)
     if isinstance(data, bytes):
-        data = data.ljust(size, pad_len.to_bytes(1, 'big'))
+        data = data.ljust(size, to_byte(pad_len))
     else:
         data = data.ljust(size, chr(pad_len))
     return data
@@ -59,7 +59,7 @@ def split_by_blocks_padding(data, block_size):
                 )
             )
     else:
-        blocks.append(chr(block_size) * block_size)
+        blocks.append(pkcs7_pad(b'' if isinstance(data, bytes) else '', block_size))
 
     return blocks
 

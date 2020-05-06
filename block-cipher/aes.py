@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import random
 import copy
 import hashlib
 import codecs
@@ -88,7 +89,7 @@ class AES:
         
         for block in blocks:
             if VERBOSE:
-                print("Block: {}".format(block))
+                print("Block: {}".format(block.hex()))
 
             state = block_to_matrix(block)
             if VERBOSE:
@@ -139,7 +140,7 @@ class AES:
         
         for block in blocks:
             if VERBOSE:
-                print("Block: {}".format(block))
+                print("Block: {}".format(block.hex()))
 
             state = block_to_matrix(block)
             if VERBOSE:
@@ -376,16 +377,22 @@ if __name__ == "__main__":
         key = s_a[0]
 
     key = byte_coord_to_sha1(key, 16)
-    # key = b"\xF1\x99\x93\xB5\x0B\x92\xA1\x9B\x05\x66\x7D\x9E\xEE\x0A\xEC\x56"
     print("Key (x with sha1): {}".format(key.hex()))
+    print("")
 
     aes = AES(key, ECB, iv)
 
-    plaintext = b"Hello, world!"
+    plaintext = [random.randint(0, 0xFF) for _ in range(16)]
+    # plaintext = b"Hello, world!"
+    plaintext = bytes(plaintext)
     print("Plaintext: {}".format(plaintext))
+    print("Plaintext (hex): {}".format(plaintext.hex()))
+    print("")
 
     ciphertext = aes.encrypt(plaintext)
     print("Ciphertext: {}".format(ciphertext.hex()))
+    print("")
 
     decrypted = aes.decrypt(ciphertext)
-    print("Decrypted : {}".format(decrypted))
+    print("Decrypted: {}".format(decrypted))
+    print("Decrypted (hex): {}".format(decrypted.hex()))
