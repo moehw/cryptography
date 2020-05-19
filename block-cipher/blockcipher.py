@@ -2,8 +2,8 @@
 
 import codecs
 
-# VERBOSE = False
-VERBOSE = True
+VERBOSE = False
+# VERBOSE = True
 
 ENCRYPT = 1
 DECRYPT = 0
