@@ -5,6 +5,7 @@ import random
 import hashlib
 from Crypto.Util.number import bytes_to_long, long_to_bytes
 
+sys.path.insert(1, '../finite-field')
 sys.path.insert(1, './finite-field')
 from finitefield import *
 
@@ -182,23 +183,40 @@ def TEST_gen_key_one_coord():
 
 
 if __name__ == "__main__":
-
     dh = ECDH(curve='secp128r1')
 
     d_a, e_a = dh.gen_key_pair()
     print("Alice's keys:")
     print("Private: {}".format(hex(d_a)))
     print("Public : {}, {}".format(hex(e_a[0]), hex(e_a[1])))
-    print("")
 
     d_b, e_b = dh.gen_key_pair()
     print("Bob's keys:")
     print("Private: {}".format(hex(d_b)))   
     print("Public : {}, {}".format(hex(e_b[0]), hex(e_b[1])))
+    print("-" * 100)
+
+    print(f"Alice's x coord: {hex(e_a[0])}")
+    last_bit = int(bin(e_a[1])[-1])
+    print(f"Alice's y last bit: {last_bit}")
+
+    y1_a, y2_a = dh.get_y_by_x(e_a[0])
+    print(f"y and -y for x: {hex(y1_a)} , {hex(y2_a)}")
+    y_a = y1_a if ((y1_a & 0x01) == last_bit) else y2_a
+    print(f"Alice's y: {hex(y_a)}")
     print("")
-    
-    s_a = dh.point_mult_k(e_b, d_a)
-    s_b = dh.point_mult_k(e_a, d_b)
+    s_b = dh.point_mult_k((e_a[0], y_a), d_b)
+
+    print(f"Bob's x coord: {hex(e_b[0])}")
+    last_bit = int(bin(e_b[1])[-1])
+    print(f"Bob's y last bit: {last_bit}")
+
+    y1_b, y2_b = dh.get_y_by_x(e_b[0])
+    print(f"y and -y for x: {hex(y1_b)} , {hex(y2_b)}")
+    y_b = y1_b if ((y1_b & 0x01) == last_bit) else y2_b
+    print(f"Bob's y: {hex(y_b)}")
+    print("")
+    s_a = dh.point_mult_k((e_b[0], y_b), d_a)
 
     if s_a != s_b:
         print("[-] Secrets are different")
